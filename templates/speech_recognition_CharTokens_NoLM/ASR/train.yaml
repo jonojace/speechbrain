@@ -51,7 +51,7 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
 # Training parameters
 number_of_epochs: 15
 number_of_ctc_epochs: 5
-batch_size: 8
+batch_size: 4
 lr: 1.0
 ctc_weight: 0.5
 sorting: ascending
@@ -83,13 +83,13 @@ inter_layer_pooling_size: (2, 2)
 cnn_kernelsize: (3, 3)
 time_pooling_size: 4
 rnn_class: !name:speechbrain.nnet.RNN.LSTM
-rnn_layers: 4
-rnn_neurons: 1024
+rnn_layers: 2
+rnn_neurons: 512
 rnn_bidirectional: True
 dnn_blocks: 2
 dnn_neurons: 512
 emb_size: 128
-dec_neurons: 1024
+dec_neurons: 512
 output_neurons: 1000  # Number of tokens (same as LM)
 blank_index: 0
 bos_index: 0
@@ -261,23 +261,48 @@ valid_search: !new:speechbrain.decoders.S2SRNNBeamSearcher
     coverage_penalty: !ref <coverage_penalty>
     temperature: !ref <temperature>
 
-# TODO should be CTC decoder?
-test_search: !new:speechbrain.decoders.S2SRNNBeamSearcher
-    embedding: !ref <embedding>
-    decoder: !ref <decoder>
-    linear: !ref <seq_lin>
-    ctc_linear: !ref <ctc_lin>
-    bos_index: !ref <bos_index>
-    eos_index: !ref <eos_index>
-    blank_index: !ref <blank_index>
-    min_decode_ratio: !ref <min_decode_ratio>
-    max_decode_ratio: !ref <max_decode_ratio>
-    beam_size: !ref <valid_beam_size>
-    eos_threshold: !ref <eos_threshold>
-    using_max_attn_shift: !ref <using_max_attn_shift>
-    max_attn_shift: !ref <max_attn_shift>
-    coverage_penalty: !ref <coverage_penalty>
-    temperature: !ref <temperature>
+## TODO should be CTC decoder?
+## TODO ctc_greedy_decode in speechbrain/decoders/ctc.py?
+#test_search: !new:speechbrain.decoders.S2SRNNBeamSearcher
+#    embedding: !ref <embedding>
+#    decoder: !ref <decoder>
+#    linear: !ref <seq_lin>
+#    ctc_linear: !ref <ctc_lin>
+#    bos_index: !ref <bos_index>
+#    eos_index: !ref <eos_index>
+#    blank_index: !ref <blank_index>
+#    min_decode_ratio: !ref <min_decode_ratio>
+#    max_decode_ratio: !ref <max_decode_ratio>
+#    beam_size: !ref <valid_beam_size>
+#    eos_threshold: !ref <eos_threshold>
+#    using_max_attn_shift: !ref <using_max_attn_shift>
+#    max_attn_shift: !ref <max_attn_shift>
+#    coverage_penalty: !ref <coverage_penalty>
+#    temperature: !ref <temperature>
+
+    # The final decoding on the test set can be more computationally demanding.
+    # In this case, we use the LM + CTC probabilities during decoding as well.
+    # Please, remove this part if you need a faster decoder.
+    test_search: !new:speechbrain.decoders.S2SRNNBeamSearchLM
+        embedding: !ref <embedding>
+        decoder: !ref <decoder>
+        linear: !ref <seq_lin>
+        ctc_linear: !ref <ctc_lin>
+        language_model: !ref <lm_model>
+        bos_index: !ref <bos_index>
+        eos_index: !ref <eos_index>
+        blank_index: !ref <blank_index>
+        min_decode_ratio: !ref <min_decode_ratio>
+        max_decode_ratio: !ref <max_decode_ratio>
+        beam_size: !ref <test_beam_size>
+        eos_threshold: !ref <eos_threshold>
+        using_max_attn_shift: !ref <using_max_attn_shift>
+        max_attn_shift: !ref <max_attn_shift>
+        coverage_penalty: !ref <coverage_penalty>
+        lm_weight: !ref <lm_weight>
+        ctc_weight: !ref <ctc_weight_decode>
+        temperature: !ref <temperature>
+        temperature_lm: !ref <temperature_lm>
 
 # This function manages learning rate annealing over the epochs.
 # We here use the NewBoB algorithm, that anneals the learning rate if
@@ -316,13 +341,13 @@ checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
 # This object is used to pretrain the language model and the tokenizers
 # (defined above). In this case, we also pretrain the ASR model (to make
 # sure the model converges on a small amount of data)
-pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
-    collect_in: !ref <save_folder>
-    loadables:
+#pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
+#    collect_in: !ref <save_folder>
+#    loadables:
 #        lm: !ref <lm_model>
 #        tokenizer: !ref <tokenizer>
 #        model: !ref <model>
-    paths:
+#    paths:
 #        lm: !ref <pretrained_path>/lm.ckpt
 #        tokenizer: !ref <pretrained_path>/tokenizer.ckpt
 #        model: !ref <pretrained_path>/asr.ckpt

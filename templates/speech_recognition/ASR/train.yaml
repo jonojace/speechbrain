@@ -51,7 +51,7 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
 # Training parameters
 number_of_epochs: 15
 number_of_ctc_epochs: 5
-batch_size: 8
+batch_size: 1
 lr: 1.0
 ctc_weight: 0.5
 sorting: ascending
