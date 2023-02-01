@@ -1,5 +1,10 @@
 #!/usr/bin/env/python3
-"""Recipe for training a sequence-to-sequence ASR system with mini-librispeech.
+"""
+Jason Fong
+- Adapted the standard ASR template to recreate BiLSTM architecture trained with CTC in
+  "Towards End-to-End Speech Recognition with Recurrent Neural Networks" (Graves, 2014)
+
+Recipe for training a sequence-to-sequence ASR system with mini-librispeech.
 The system employs an encoder, a decoder, and an attention mechanism
 between them. Decoding is performed with beam search coupled with a neural
 language model.
@@ -79,33 +84,35 @@ class ASR(sb.Brain):
         # We first move the batch to the appropriate device.
         batch = batch.to(self.device)
         feats, self.feat_lens = self.prepare_features(stage, batch.sig)
-        tokens_bos, _ = self.prepare_tokens(stage, batch.tokens_bos)
+        # tokens_bos, _ = self.prepare_tokens(stage, batch.tokens_bos)
 
         # Running the encoder (prevent propagation to feature extraction)
         encoded_signal = self.modules.encoder(feats.detach())
 
-        # Embed tokens and pass tokens & encoded signal to decoder
-        embedded_tokens = self.modules.embedding(tokens_bos)
-        decoder_outputs, _ = self.modules.decoder(
-            embedded_tokens, encoded_signal, self.feat_lens
-        )
+        # # Embed tokens and pass tokens & encoded signal to decoder
+        # embedded_tokens = self.modules.embedding(tokens_bos)
+        # decoder_outputs, _ = self.modules.decoder(
+        #     embedded_tokens, encoded_signal, self.feat_lens
+        # )
 
-        # Output layer for seq2seq log-probabilities
-        logits = self.modules.seq_lin(decoder_outputs)
-        predictions = {"seq_logprobs": self.hparams.log_softmax(logits)}
+        # # Output layer for seq2seq log-probabilities
+        # logits = self.modules.seq_lin(decoder_outputs)
+        # predictions = {"seq_logprobs": self.hparams.log_softmax(logits)}
+
+        predictions = {}
 
         if self.is_ctc_active(stage):
             # Output layer for ctc log-probabilities
             ctc_logits = self.modules.ctc_lin(encoded_signal)
             predictions["ctc_logprobs"] = self.hparams.log_softmax(ctc_logits)
-        elif stage == sb.Stage.VALID:
-            predictions["tokens"], _ = self.hparams.valid_search(
-                encoded_signal, self.feat_lens
-            )
-        elif stage == sb.Stage.TEST:
-            predictions["tokens"], _ = self.hparams.test_search(
-                encoded_signal, self.feat_lens
-            )
+        # elif stage == sb.Stage.VALID:
+        #     predictions["tokens"], _ = self.hparams.valid_search(
+        #         encoded_signal, self.feat_lens
+        #     )
+        # elif stage == sb.Stage.TEST:
+        #     predictions["tokens"], _ = self.hparams.test_search(
+        #         encoded_signal, self.feat_lens
+        #     )
 
         return predictions
 
@@ -117,10 +124,11 @@ class ASR(sb.Brain):
         stage : sb.Stage
             Currently executing stage.
         """
-        if stage != sb.Stage.TRAIN:
-            return False
-        current_epoch = self.hparams.epoch_counter.current
-        return current_epoch <= self.hparams.number_of_ctc_epochs
+        # if stage != sb.Stage.TRAIN:
+        #     return False
+        # current_epoch = self.hparams.epoch_counter.current
+        # return current_epoch <= self.hparams.number_of_ctc_epochs
+        return True
 
     def prepare_features(self, stage, wavs):
         """Prepare features for computation on-the-fly
@@ -189,33 +197,43 @@ class ASR(sb.Brain):
             A one-element tensor used for backpropagating the gradient.
         """
         # Compute sequence loss against targets with EOS
-        tokens_eos, tokens_eos_lens = self.prepare_tokens(
-            stage, batch.tokens_eos
-        )
-        loss = sb.nnet.losses.nll_loss(
-            log_probabilities=predictions["seq_logprobs"],
-            targets=tokens_eos,
-            length=tokens_eos_lens,
-            label_smoothing=self.hparams.label_smoothing,
-        )
+        # tokens_eos, tokens_eos_lens = self.prepare_tokens(
+        #     stage, batch.tokens_eos
+        # )
+
+        # loss = sb.nnet.losses.nll_loss(
+        #     log_probabilities=predictions["seq_logprobs"],
+        #     targets=tokens_eos,
+        #     length=tokens_eos_lens,
+        #     label_smoothing=self.hparams.label_smoothing,
+        # )
 
         # Add ctc loss if necessary. The total cost is a weighted sum of
         # ctc loss + seq2seq loss
-        if self.is_ctc_active(stage):
-            # Load tokens without EOS as CTC targets
-            tokens, tokens_lens = self.prepare_tokens(stage, batch.tokens)
-            loss_ctc = self.hparams.ctc_cost(
-                predictions["ctc_logprobs"], tokens, self.feat_lens, tokens_lens
-            )
-            loss *= 1 - self.hparams.ctc_weight
-            loss += self.hparams.ctc_weight * loss_ctc
+        # if self.is_ctc_active(stage):
+
+        # Load tokens without EOS as CTC targets
+        tokens, tokens_lens = self.prepare_tokens(stage, batch.tokens)
+        loss = self.hparams.ctc_cost(
+            predictions["ctc_logprobs"], tokens, self.feat_lens, tokens_lens
+        )
+
+            # loss *= 1 - self.hparams.ctc_weight
+            # loss += self.hparams.ctc_weight * loss_ctc
 
         if stage != sb.Stage.TRAIN:
-            # Converted predicted tokens from indexes to words
-            predicted_words = [
-                self.hparams.tokenizer.decode_ids(prediction).split(" ")
-                for prediction in predictions["tokens"]
-            ]
+            # # Converted predicted tokens from indexes to words
+            # predicted_words = [
+            #     self.hparams.tokenizer.decode_ids(prediction).split(" ")
+            #     for prediction in predictions["tokens"]
+            # ]
+
+            # TODO replace with S2SBeamSearcher? but set LM weight to 0 so it uses CTC prefix scorer to do beam search
+            # TODO and find alternative hypotheses
+            predicted_words = sb.decoders.ctc_greedy_decode(
+                predictions, self.feat_lens, blank_id=self.hparams.blank_index
+            )
+
             target_words = [words.split(" ") for words in batch.words]
 
             # Monitor word error rate and character error rated at
@@ -328,17 +346,18 @@ def dataio_prepare(hparams):
     # The tokens without BOS or EOS is for computing CTC loss.
     @sb.utils.data_pipeline.takes("words")
     @sb.utils.data_pipeline.provides(
-        "words", "tokens_list", "tokens_bos", "tokens_eos", "tokens"
+        "words", "tokens_list", "tokens"
     )
     def text_pipeline(words):
-        """Processes the transcriptions to generate proper labels"""
+        """Processes the transcriptions to generate proper labels
+
+        NB Make sure that you yield exactly what is defined above in @sb.utils.data_pipeline.provides()"""
         yield words
+
         tokens_list = hparams["tokenizer"].encode_as_ids(words)
+        assert len(tokens_list) > 0, f"Something is wrong with the tokenizer."
         yield tokens_list
-        tokens_bos = torch.LongTensor([hparams["bos_index"]] + (tokens_list))
-        yield tokens_bos
-        tokens_eos = torch.LongTensor(tokens_list + [hparams["eos_index"]])
-        yield tokens_eos
+
         tokens = torch.LongTensor(tokens_list)
         yield tokens
 
@@ -361,8 +380,6 @@ def dataio_prepare(hparams):
                 "id",
                 "sig",
                 "words",
-                "tokens_bos",
-                "tokens_eos",
                 "tokens",
             ],
         )
@@ -430,8 +447,8 @@ if __name__ == "__main__":
     # you can train from scratch and avoid this step.
     # We download the pretrained LM from HuggingFace (or elsewhere depending on
     # the path given in the YAML file). The tokenizer is loaded at the same time.
-    run_on_main(hparams["pretrainer"].collect_files)
-    hparams["pretrainer"].load_collected(device=run_opts["device"])
+    # run_on_main(hparams["pretrainer"].collect_files)
+    # hparams["pretrainer"].load_collected(device=run_opts["device"])
 
     # Trainer initialization
     asr_brain = ASR(

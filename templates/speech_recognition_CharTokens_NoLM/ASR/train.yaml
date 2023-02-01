@@ -50,10 +50,10 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
 
 # Training parameters
 number_of_epochs: 15
-number_of_ctc_epochs: 5
+number_of_ctc_epochs: !ref <number_of_epochs>
 batch_size: 4
 lr: 1.0
-ctc_weight: 0.5
+ctc_weight: 1.0
 sorting: ascending
 ckpt_interval_minutes: 15 # save checkpoint every N min
 label_smoothing: 0.1
@@ -90,7 +90,7 @@ dnn_blocks: 2
 dnn_neurons: 512
 emb_size: 128
 dec_neurons: 512
-output_neurons: 1000  # Number of tokens (same as LM)
+output_neurons: 28  # Number of tokens (same as LM)
 blank_index: 0
 bos_index: 0
 eos_index: 0
@@ -161,35 +161,35 @@ encoder: !new:speechbrain.lobes.models.CRDNN.CRDNN
     dnn_neurons: !ref <dnn_neurons>
     use_rnnp: False
 
-# Embedding (from indexes to an embedding space of dimension emb_size).
-embedding: !new:speechbrain.nnet.embedding.Embedding
-    num_embeddings: !ref <output_neurons>
-    embedding_dim: !ref <emb_size>
+## Embedding (from indexes to an embedding space of dimension emb_size).
+#embedding: !new:speechbrain.nnet.embedding.Embedding
+#    num_embeddings: !ref <output_neurons>
+#    embedding_dim: !ref <emb_size>
 
-# Attention-based RNN decoder.
-decoder: !new:speechbrain.nnet.RNN.AttentionalRNNDecoder
-    enc_dim: !ref <dnn_neurons>
-    input_size: !ref <emb_size>
-    rnn_type: gru
-    attn_type: location
-    hidden_size: !ref <dec_neurons>
-    attn_dim: 1024
-    num_layers: 1
-    scaling: 1.0
-    channels: 10
-    kernel_size: 100
-    re_init: True
-    dropout: !ref <dropout>
+## Attention-based RNN decoder.
+#decoder: !new:speechbrain.nnet.RNN.AttentionalRNNDecoder
+#    enc_dim: !ref <dnn_neurons>
+#    input_size: !ref <emb_size>
+#    rnn_type: gru
+#    attn_type: location
+#    hidden_size: !ref <dec_neurons>
+#    attn_dim: 1024
+#    num_layers: 1
+#    scaling: 1.0
+#    channels: 10
+#    kernel_size: 100
+#    re_init: True
+#    dropout: !ref <dropout>
 
 # Linear transformation on the top of the encoder.
 ctc_lin: !new:speechbrain.nnet.linear.Linear
     input_size: !ref <dnn_neurons>
     n_neurons: !ref <output_neurons>
 
-# Linear transformation on the top of the decoder.
-seq_lin: !new:speechbrain.nnet.linear.Linear
-    input_size: !ref <dec_neurons>
-    n_neurons: !ref <output_neurons>
+## Linear transformation on the top of the decoder.
+#seq_lin: !new:speechbrain.nnet.linear.Linear
+#    input_size: !ref <dec_neurons>
+#    n_neurons: !ref <output_neurons>
 
 # Final softmax (for log posteriors computation).
 log_softmax: !new:speechbrain.nnet.activations.Softmax
@@ -202,39 +202,44 @@ ctc_cost: !name:speechbrain.nnet.losses.ctc_loss
 
 # Tokenizer initialization
 tokenizer: !new:sentencepiece.SentencePieceProcessor
+    model_file: ../Tokenizer/save/0_char.model # full path to Tokenizer
+
+# from speechbrain/templates/speech_recognition_CharTokens_NoLM/Tokenizer/tokenizer.yaml
+#tokenizer: !name:speechbrain.tokenizers.SentencePiece.SentencePiece
+#   model_dir: ../Tokenizer/save
 
 # Objects in "modules" dict will have their parameters moved to the correct
 # device, as well as having train()/eval() called on them by the Brain class
 modules:
     encoder: !ref <encoder>
-    embedding: !ref <embedding>
-    decoder: !ref <decoder>
     ctc_lin: !ref <ctc_lin>
-    seq_lin: !ref <seq_lin>
     normalize: !ref <normalize>
     env_corrupt: !ref <env_corrupt>
-    lm_model: !ref <lm_model>
+#    decoder: !ref <decoder>
+#    lm_model: !ref <lm_model>
+#    embedding: !ref <embedding>
+#    seq_lin: !ref <seq_lin>
 
 # Gathering all the submodels in a single model object.
 model: !new:torch.nn.ModuleList
     - - !ref <encoder>
-      - !ref <embedding>
-      - !ref <decoder>
       - !ref <ctc_lin>
-      - !ref <seq_lin>
+#      - !ref <embedding>
+#      - !ref <decoder>
+#      - !ref <seq_lin>
 
 # This is the RNNLM that is used according to the Huggingface repository
 # NB: It has to match the pre-trained RNNLM!!
-lm_model: !new:speechbrain.lobes.models.RNNLM.RNNLM
-    output_neurons: !ref <output_neurons>
-    embedding_dim: !ref <emb_size>
-    activation: !name:torch.nn.LeakyReLU
-    dropout: 0.0
-    rnn_layers: 2
-    rnn_neurons: 2048
-    dnn_blocks: 1
-    dnn_neurons: 512
-    return_hidden: True  # For inference
+#lm_model: !new:speechbrain.lobes.models.RNNLM.RNNLM
+#    output_neurons: !ref <output_neurons>
+#    embedding_dim: !ref <emb_size>
+#    activation: !name:torch.nn.LeakyReLU
+#    dropout: 0.0
+#    rnn_layers: 2
+#    rnn_neurons: 2048
+#    dnn_blocks: 1
+#    dnn_neurons: 512
+#    return_hidden: True  # For inference
 
 # Beamsearch is applied on the top of the decoder. If the language model is
 # given, a language model is applied (with a weight specified in lm_weight).
@@ -244,22 +249,22 @@ lm_model: !new:speechbrain.lobes.models.RNNLM.RNNLM
 
 # It makes sense to have a lighter search during validation. In this case,
 # we don't use the LM and CTC probabilities during decoding.
-valid_search: !new:speechbrain.decoders.S2SRNNBeamSearcher
-    embedding: !ref <embedding>
-    decoder: !ref <decoder>
-    linear: !ref <seq_lin>
-    ctc_linear: !ref <ctc_lin>
-    bos_index: !ref <bos_index>
-    eos_index: !ref <eos_index>
-    blank_index: !ref <blank_index>
-    min_decode_ratio: !ref <min_decode_ratio>
-    max_decode_ratio: !ref <max_decode_ratio>
-    beam_size: !ref <valid_beam_size>
-    eos_threshold: !ref <eos_threshold>
-    using_max_attn_shift: !ref <using_max_attn_shift>
-    max_attn_shift: !ref <max_attn_shift>
-    coverage_penalty: !ref <coverage_penalty>
-    temperature: !ref <temperature>
+#valid_search: !new:speechbrain.decoders.S2SRNNBeamSearcher
+#    embedding: !ref <embedding>
+#    decoder: !ref <decoder>
+#    linear: !ref <seq_lin>
+#    ctc_linear: !ref <ctc_lin>
+#    bos_index: !ref <bos_index>
+#    eos_index: !ref <eos_index>
+#    blank_index: !ref <blank_index>
+#    min_decode_ratio: !ref <min_decode_ratio>
+#    max_decode_ratio: !ref <max_decode_ratio>
+#    beam_size: !ref <valid_beam_size>
+#    eos_threshold: !ref <eos_threshold>
+#    using_max_attn_shift: !ref <using_max_attn_shift>
+#    max_attn_shift: !ref <max_attn_shift>
+#    coverage_penalty: !ref <coverage_penalty>
+#    temperature: !ref <temperature>
 
 ## TODO should be CTC decoder?
 ## TODO ctc_greedy_decode in speechbrain/decoders/ctc.py?
@@ -283,26 +288,26 @@ valid_search: !new:speechbrain.decoders.S2SRNNBeamSearcher
     # The final decoding on the test set can be more computationally demanding.
     # In this case, we use the LM + CTC probabilities during decoding as well.
     # Please, remove this part if you need a faster decoder.
-    test_search: !new:speechbrain.decoders.S2SRNNBeamSearchLM
-        embedding: !ref <embedding>
-        decoder: !ref <decoder>
-        linear: !ref <seq_lin>
-        ctc_linear: !ref <ctc_lin>
-        language_model: !ref <lm_model>
-        bos_index: !ref <bos_index>
-        eos_index: !ref <eos_index>
-        blank_index: !ref <blank_index>
-        min_decode_ratio: !ref <min_decode_ratio>
-        max_decode_ratio: !ref <max_decode_ratio>
-        beam_size: !ref <test_beam_size>
-        eos_threshold: !ref <eos_threshold>
-        using_max_attn_shift: !ref <using_max_attn_shift>
-        max_attn_shift: !ref <max_attn_shift>
-        coverage_penalty: !ref <coverage_penalty>
-        lm_weight: !ref <lm_weight>
-        ctc_weight: !ref <ctc_weight_decode>
-        temperature: !ref <temperature>
-        temperature_lm: !ref <temperature_lm>
+#    test_search: !new:speechbrain.decoders.S2SRNNBeamSearchLM
+#        embedding: !ref <embedding>
+#        decoder: !ref <decoder>
+#        linear: !ref <seq_lin>
+#        ctc_linear: !ref <ctc_lin>
+#        language_model: !ref <lm_model>
+#        bos_index: !ref <bos_index>
+#        eos_index: !ref <eos_index>
+#        blank_index: !ref <blank_index>
+#        min_decode_ratio: !ref <min_decode_ratio>
+#        max_decode_ratio: !ref <max_decode_ratio>
+#        beam_size: !ref <test_beam_size>
+#        eos_threshold: !ref <eos_threshold>
+#        using_max_attn_shift: !ref <using_max_attn_shift>
+#        max_attn_shift: !ref <max_attn_shift>
+#        coverage_penalty: !ref <coverage_penalty>
+#        lm_weight: !ref <lm_weight>
+#        ctc_weight: !ref <ctc_weight_decode>
+#        temperature: !ref <temperature>
+#        temperature_lm: !ref <temperature_lm>
 
 # This function manages learning rate annealing over the epochs.
 # We here use the NewBoB algorithm, that anneals the learning rate if
@@ -344,11 +349,11 @@ checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
 #pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
 #    collect_in: !ref <save_folder>
 #    loadables:
-#        lm: !ref <lm_model>
 #        tokenizer: !ref <tokenizer>
-#        model: !ref <model>
+##        lm: !ref <lm_model>
+##        model: !ref <model>
 #    paths:
-#        lm: !ref <pretrained_path>/lm.ckpt
 #        tokenizer: !ref <pretrained_path>/tokenizer.ckpt
-#        model: !ref <pretrained_path>/asr.ckpt
+##        lm: !ref <pretrained_path>/lm.ckpt
+##        model: !ref <pretrained_path>/asr.ckpt
 
