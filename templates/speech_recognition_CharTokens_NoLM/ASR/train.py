@@ -230,9 +230,13 @@ class ASR(sb.Brain):
 
             # TODO replace with S2SBeamSearcher? but set LM weight to 0 so it uses CTC prefix scorer to do beam search
             # TODO and find alternative hypotheses
-            predicted_words = sb.decoders.ctc_greedy_decode(
-                predictions, self.feat_lens, blank_id=self.hparams.blank_index
+            predicted_ids = sb.decoders.ctc_greedy_decode(
+                predictions["ctc_logprobs"], self.feat_lens, blank_id=self.hparams.blank_index
             )
+            predicted_words = [
+                self.hparams.tokenizer.decode_ids(ids).split(" ")
+                for ids in predicted_ids
+            ]
 
             target_words = [words.split(" ") for words in batch.words]
 
