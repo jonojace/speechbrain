@@ -22,7 +22,7 @@ __set_seed: !apply:torch.manual_seed [!ref <seed>]
 # Reading data from the local disk of the compute node (e.g. $SLURM_TMPDIR with SLURM-based clusters) is very important.
 # It allows you to read the data much faster without slowing down the shared filesystem.
 
-data_folder: ../data # In this case, data will be automatically downloaded here.
+data_folder: /disk/scratch_ssd/s1785140/data # scratch disk on slurm node
 data_folder_rirs: !ref <data_folder> # noise/ris dataset will automatically be downloaded here
 output_folder: !ref results/CRDNN_BPE_960h/<seed>
 wer_file: !ref <output_folder>/wer.txt
@@ -45,9 +45,9 @@ corpus_name: ljspeech
 uttids_to_excl: ../data/respeller_uttids.txt # used to specify the uttids from which train valid and test splits are created, if none will use all uttids in corpus
 valid_percent: 0.05 # what proportion of data is allocated to validation set
 test_percent: 0.05 # what proportion of data is allocated to test set
-train_annotation: !ref ../train_<corpus_name>.json
-valid_annotation: !ref ../valid_<corpus_name>.json
-test_annotation: !ref ../test_<corpus_name>.json
+train_annotation: !ref train_<corpus_name>.json
+valid_annotation: !ref valid_<corpus_name>.json
+test_annotation: !ref test_<corpus_name>.json
 text_cleaners: # list of text cleaners, applied in order from top to bottom
     - lowercase_no_punc # normalisation that is applied to text transcription of corpus
 
@@ -57,13 +57,13 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
 # TODO update this to use WandBLogger? example at recipes/Voicebank/MTL/CoopNet/ is gone...
 
 # Training parameters
-number_of_epochs: 15
+number_of_epochs: 100
 number_of_ctc_epochs: !ref <number_of_epochs>
 batch_size: 8
 lr: 1.0
 ctc_weight: 1.0
 sorting: ascending
-ckpt_interval_minutes: 15 # save checkpoint every N min
+ckpt_interval_minutes: 30 # save checkpoint every N min
 label_smoothing: 0.1
 
 # Dataloader options

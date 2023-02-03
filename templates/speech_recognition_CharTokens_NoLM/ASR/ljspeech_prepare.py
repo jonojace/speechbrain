@@ -25,6 +25,10 @@ SAMPLERATE = 22050
 LJSPEECH_EXPECTED_N = 13100
 
 
+def convert16k(inputfile, outputfile16k):
+    command = (f'sox -c 1 -b 16 {inputfile} -t wav {outputfile16k} rate 16k')
+    subprocess.call(shlex.split(command))
+
 def prepare_ljspeech(
         data_folder, uttids_to_excl, valid_percent, test_percent,
         save_json_train, save_json_valid, save_json_test,
@@ -51,7 +55,6 @@ def prepare_ljspeech(
     >>> data_folder = '/path/to/mini_librispeech'
     >>> prepare_mini_librispeech(data_folder, 'train.json', 'valid.json', 'test.json')
     """
-
     # Check if this phase is already done (if so, skip it)
     if skip(save_json_train, save_json_valid, save_json_test):
         logger.info("Preparation completed in previous run, skipping.")
@@ -75,15 +78,11 @@ def prepare_ljspeech(
     # downsample files to 16khz if not done already
     wavs_16khz_folder = os.path.join(ljspeech_folder, 'wavs_16khz')
     if not check_folders(wavs_16khz_folder):
-        def convert16k(inputfile, outputfile16k):
-            command = (f'sox -c 1 -b 16 {inputfile} -t wav {outputfile16k} rate 16k')
-            subprocess.call(shlex.split(command))
         print(f"Downsampling wavs to 16khz...")
         os.mkdir(wavs_16khz_folder)
         for wav_p in tqdm(wav_list):
             wavfile = wav_p.split(os.path.sep)[-1]
             outputfile16k = os.path.join(wavs_16khz_folder, wavfile)
-            # print(wav_p, outputfile16k)
             convert16k(wav_p, outputfile16k)
 
     # filter out uttids since we do not want to train the ASR model on ids that the respeller will be trained on
@@ -195,7 +194,9 @@ def skip(*filenames):
     """
     for filename in filenames:
         if not os.path.isfile(filename):
+            print("Not skipping data prep...")
             return False
+    print("Data preparation done, found annotation files at:", filenames)
     return True
 
 

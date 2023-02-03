@@ -436,6 +436,11 @@ if __name__ == "__main__":
         overrides=overrides,
     )
 
+    # save annotation files in the data dir
+    hparams["train_annotation"] = os.path.join(hparams["data_folder"], hparams["train_annotation"])
+    hparams["valid_annotation"] = os.path.join(hparams["data_folder"], hparams["valid_annotation"])
+    hparams["test_annotation"] = os.path.join(hparams["data_folder"], hparams["test_annotation"])
+
     # Data preparation, to be run on only one process.
     if hparams["corpus_name"] == 'ljspeech':
         dataprep_fn = prepare_ljspeech
