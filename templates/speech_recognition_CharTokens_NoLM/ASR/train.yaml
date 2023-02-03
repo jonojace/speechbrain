@@ -40,18 +40,26 @@ train_log: !ref <output_folder>/train_log.txt
 
 # Path where data manifest files will be stored. The data manifest files are created by the
 # data preparation script
-train_annotation: ../train.json
-valid_annotation: ../valid.json
-test_annotation: ../test.json
+corpus_name: ljspeech
+#corpus_name: mini_librispeech
+uttids_to_excl: ../data/respeller_uttids.txt # used to specify the uttids from which train valid and test splits are created, if none will use all uttids in corpus
+valid_percent: 0.05 # what proportion of data is allocated to validation set
+test_percent: 0.05 # what proportion of data is allocated to test set
+train_annotation: !ref ../train_<corpus_name>.json
+valid_annotation: !ref ../valid_<corpus_name>.json
+test_annotation: !ref ../test_<corpus_name>.json
+text_cleaners: # list of text cleaners, applied in order from top to bottom
+    - lowercase_no_punc # normalisation that is applied to text transcription of corpus
 
 # The train logger writes training statistics to a file, as well as stdout.
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
     save_file: !ref <train_log>
+# TODO update this to use WandBLogger? example at recipes/Voicebank/MTL/CoopNet/ is gone...
 
 # Training parameters
 number_of_epochs: 15
 number_of_ctc_epochs: !ref <number_of_epochs>
-batch_size: 2
+batch_size: 8
 lr: 1.0
 ctc_weight: 1.0
 sorting: ascending
@@ -71,7 +79,7 @@ test_dataloader_opts:
 
 # Feature parameters
 sample_rate: 16000
-n_fft: 400
+n_fft: 400 # mini librispeech
 n_mels: 40
 
 # Model parameters

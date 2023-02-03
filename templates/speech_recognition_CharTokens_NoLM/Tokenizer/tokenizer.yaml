@@ -11,15 +11,28 @@ data_folder: ../data
 output_folder: ./save
 
 # Path where data-specification files are stored
-train_annotation: ../train.json
-valid_annotation: ../valid.json
-test_annotation: ../test.json
+corpus_name: ljspeech
+#corpus_name: mini_librispeech
+uttids_to_excl: ../data/respeller_uttids.txt # used to specify the uttids from which train valid and test splits are created, if none will use all uttids in corpus
+valid_percent: 0.05 # what proportion of data is allocated to validation set
+test_percent: 0.05 # what proportion of data is allocated to test set
+train_annotation: !ref ../train_<corpus_name>.json
+valid_annotation: !ref ../valid_<corpus_name>.json
+test_annotation: !ref ../test_<corpus_name>.json
+text_cleaners: # list of text cleaners, applied in order from top to bottom
+    - lowercase_no_punc # normalisation that is applied to text transcription of corpus
 
 # Tokenizer parameters
 token_type: char  # ["unigram", "bpe", "char"]
 token_output: 0
 character_coverage: 1.0
 annotation_read: words # field to read
+
+# Vocab
+# 0 <unk>
+# 1 _ (whitespace)
+# 2 a
+# 27 z
 
 # Tokenizer object
 tokenizer: !name:speechbrain.tokenizers.SentencePiece.SentencePiece
