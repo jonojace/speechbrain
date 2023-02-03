@@ -56,6 +56,8 @@ from hyperpyyaml import load_hyperpyyaml
 from mini_librispeech_prepare import prepare_mini_librispeech
 from ljspeech_prepare import prepare_ljspeech
 from speechbrain.utils.distributed import run_on_main
+import os
+import wandb
 
 logger = logging.getLogger(__name__)
 
@@ -218,6 +220,7 @@ class ASR(sb.Brain):
         loss = self.hparams.ctc_cost(
             predictions["ctc_logprobs"], tokens, self.feat_lens, tokens_lens
         )
+        wandb.log({'train.loss': loss})
 
             # loss *= 1 - self.hparams.ctc_weight
             # loss += self.hparams.ctc_weight * loss_ctc
@@ -416,7 +419,6 @@ def dataio_prepare(hparams):
         )
     return datasets
 
-
 if __name__ == "__main__":
 
     # Reading command line arguments
@@ -428,6 +430,9 @@ if __name__ == "__main__":
     # Load hyperparameters file with command-line overrides
     with open(hparams_file) as fin:
         hparams = load_hyperpyyaml(fin, overrides)
+
+    # print("debug hparams", hparams.__dict__)
+    wandb.config.update(hparams, allow_val_change=True)  # now we update config as yaml has been properly parsed
 
     # Create experiment directory
     sb.create_experiment_directory(

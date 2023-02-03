@@ -22,9 +22,13 @@ __set_seed: !apply:torch.manual_seed [!ref <seed>]
 # Reading data from the local disk of the compute node (e.g. $SLURM_TMPDIR with SLURM-based clusters) is very important.
 # It allows you to read the data much faster without slowing down the shared filesystem.
 
+wandb_project_name: asr_models
+exp_name: CRDNN_CHAR_LJSpeech_halved
+
+#data_folder: ../data # In this case, data will be automatically downloaded here.
 data_folder: /disk/scratch_ssd/s1785140/data # scratch disk on slurm node
 data_folder_rirs: !ref <data_folder> # noise/ris dataset will automatically be downloaded here
-output_folder: !ref results/CRDNN_BPE_960h/<seed>
+output_folder: !ref results/<exp_name>/<seed>
 wer_file: !ref <output_folder>/wer.txt
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
@@ -52,9 +56,15 @@ text_cleaners: # list of text cleaners, applied in order from top to bottom
     - lowercase_no_punc # normalisation that is applied to text transcription of corpus
 
 # The train logger writes training statistics to a file, as well as stdout.
-train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
-    save_file: !ref <train_log>
+#train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
+#    save_file: !ref <train_log>
 # TODO update this to use WandBLogger? example at recipes/Voicebank/MTL/CoopNet/ is gone...
+train_logger: !new:speechbrain.utils.train_logger.WandBLogger
+    yaml_config: ./train.yaml # the current yaml file
+    project_name: !ref <wandb_project_name>
+    exp_name: !ref <exp_name>
+    run_id: None # set this to a wandb run id in order to force resume
+    resume_wandb: True # automatically resume wandb run if the previous run crashed or failed
 
 # Training parameters
 number_of_epochs: 100
