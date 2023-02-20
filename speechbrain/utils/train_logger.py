@@ -7,6 +7,7 @@ import logging
 import ruamel.yaml
 import torch
 import os
+import wandb
 
 logger = logging.getLogger(__name__)
 
@@ -15,12 +16,12 @@ class TrainLogger:
     """Abstract class defining an interface for training loggers."""
 
     def log_stats(
-        self,
-        stats_meta,
-        train_stats=None,
-        valid_stats=None,
-        test_stats=None,
-        verbose=False,
+            self,
+            stats_meta,
+            train_stats=None,
+            valid_stats=None,
+            test_stats=None,
+            verbose=False,
     ):
         """Log the stats for one epoch.
 
@@ -78,12 +79,12 @@ class FileTrainLogger(TrainLogger):
         )
 
     def log_stats(
-        self,
-        stats_meta,
-        train_stats=None,
-        valid_stats=None,
-        test_stats=None,
-        verbose=True,
+            self,
+            stats_meta,
+            train_stats=None,
+            valid_stats=None,
+            test_stats=None,
+            verbose=True,
     ):
         """See TrainLogger.log_stats()"""
         string_summary = self._stats_to_string(stats_meta)
@@ -124,12 +125,12 @@ class TensorboardLogger(TrainLogger):
         self.global_step = {"train": {}, "valid": {}, "test": {}, "meta": 0}
 
     def log_stats(
-        self,
-        stats_meta,
-        train_stats=None,
-        valid_stats=None,
-        test_stats=None,
-        verbose=False,
+            self,
+            stats_meta,
+            train_stats=None,
+            valid_stats=None,
+            test_stats=None,
+            verbose=False,
     ):
         """See TrainLogger.log_stats()"""
         self.global_step["meta"] += 1
@@ -178,24 +179,50 @@ class WandBLogger(TrainLogger):
     An example on how to use this can be found in recipes/Voicebank/MTL/CoopNet/"""
 
     def __init__(self, *args, **kwargs):
-        try:
-            yaml_file = kwargs.pop("yaml_config")
-            with open(yaml_file, "r") as yaml_stream:
-                # Read yaml with ruamel to ignore bangs
-                config_dict = ruamel.yaml.YAML().load(yaml_stream)
-            self.run = kwargs.pop("initializer", None)(
-                *args, **kwargs, config=config_dict
-            )
-        except Exception as e:
-            raise e("There was an issue with the WandB Logger initialization")
+        # yaml_file = kwargs["yaml_config"]
+        # with open(yaml_file, "r") as yaml_stream:
+        #     config_dict = ruamel.yaml.YAML().load(yaml_stream) # Read yaml with ruamel to ignore bangs
+        # wandb_config = vars(config_dict)  # store important information into WANDB config for easier tracking of experiments
+        # print("debug yaml", config_dict)
+
+        # run_id = None if kwargs["run_id"] in ('None', 'none') else kwargs["run_id"]
+        # print("debug wandblogger", kwargs["resume_wandb"], type(kwargs["resume_wandb"]), kwargs["run_id"], type(kwargs["run_id"]), run_id, type(run_id))
+
+        self.project_name = kwargs["project_name"]
+        self.name = kwargs["exp_name"]
+        self.resume = kwargs["resume_wandb"]
+        self.run_id = None if kwargs["run_id"] in ('None', 'none') else kwargs["run_id"]
+
+        # wandb.login()  # causes problems when running job on slurm?
+        # self.run = wandb.init(
+        #     project=kwargs["project_name"],
+        #     name=kwargs["exp_name"],
+        #     config=wandb_config,  # init with empty config for now as the yaml file hasn't been properly parsed
+        #     resume=kwargs["resume_wandb"],
+        #     # id=run_id,
+        # )
+
+    def init(self, hparams_dict):
+        """Initializes wandb"""
+        wandb.login()  # causes problems when running job on slurm?
+        self.run = wandb.init(
+            project=self.project_name,
+            name=self.name,
+            config=hparams_dict,  # init with empty config for now as the yaml file hasn't been properly parsed
+            resume=self.resume,
+            # id=run_id,
+        )
+
+    def log_dict(self, d):
+        self.run.log(d)
 
     def log_stats(
-        self,
-        stats_meta,
-        train_stats=None,
-        valid_stats=None,
-        test_stats=None,
-        verbose=False,
+            self,
+            stats_meta,
+            train_stats=None,
+            valid_stats=None,
+            test_stats=None,
+            verbose=False,
     ):
         """See TrainLogger.log_stats()"""
 
@@ -206,14 +233,24 @@ class WandBLogger(TrainLogger):
             ("test", test_stats),
         ]:
             if stats is None:
+                # print(f"skipping {dataset=} {stats=}")
                 continue
+            # else:
+                # print(f"logging {dataset=} {stats=}")
             logs[dataset] = stats
 
+            # print(f"debug log {logs[dataset]=}")
+
         step = stats_meta.get("epoch", None)
+        d = {**logs, **stats_meta}
         if step is not None:  # Useful for continuing runs that crashed
-            self.run.log({**logs, **stats_meta}, step=step)
+            # print(f"debug {d=}")
+            # print("log with step")
+            self.run.log(d) #, step=step)
         else:
-            self.run.log({**logs, **stats_meta})
+            # print(f"debug {d=}")
+            # print("log without step")
+            self.run.log(d)
 
 
 def _get_image_saver():
@@ -304,7 +341,7 @@ class ProgressSampleLogger:
     DEFAULT_FORMAT = "image"
 
     def __init__(
-        self, output_path, formats=None, format_defs=None, batch_sample_size=1
+            self, output_path, formats=None, format_defs=None, batch_sample_size=1
     ):
         self.progress_samples = {}
         self.formats = formats or {}

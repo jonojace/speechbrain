@@ -1125,6 +1125,7 @@ class Brain:
         progressbar=None,
         train_loader_kwargs={},
         valid_loader_kwargs={},
+        dump_feats=False,
     ):
         """Iterate epochs and datasets to improve objective.
 
@@ -1199,11 +1200,15 @@ class Brain:
 
             # Debug mode only runs a few epochs
             if (
-                self.debug
-                and epoch == self.debug_epochs
+                (self.debug and epoch == self.debug_epochs)
                 or self._optimizer_step_limit_exceeded
             ):
                 break
+
+            if dump_feats:  # break as we dont need to run multiple epochs if we just want to dump feats
+                # print(f"{epoch=}, finished dumping features for train and valid sets, now quitting training loop...")
+                break
+
 
     @property
     def _optimizer_step_limit_exceeded(self):

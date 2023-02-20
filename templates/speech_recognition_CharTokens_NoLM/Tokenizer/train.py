@@ -20,6 +20,7 @@ import sys
 import speechbrain as sb
 from hyperpyyaml import load_hyperpyyaml
 from mini_librispeech_prepare import prepare_mini_librispeech
+from ljspeech_prepare import prepare_ljspeech
 
 if __name__ == "__main__":
 
@@ -36,12 +37,32 @@ if __name__ == "__main__":
     )
 
     # Data preparation, to be run on only one process.
-    prepare_mini_librispeech(
-        data_folder=hparams["data_folder"],
-        save_json_train=hparams["train_annotation"],
-        save_json_valid=hparams["valid_annotation"],
-        save_json_test=hparams["test_annotation"],
-    )
+    if hparams["corpus_name"] == 'ljspeech':
+        print("Prepping ljspeech")
+        dataprep_fn = prepare_ljspeech
+        dataprep_kwargs = {
+            "data_folder": hparams["data_folder"],
+            "uttids_to_excl": hparams["uttids_to_excl"],
+            "valid_percent": hparams["valid_percent"],
+            "test_percent": hparams["test_percent"],
+            "save_json_train": hparams["train_annotation"],
+            "save_json_valid": hparams["valid_annotation"],
+            "save_json_test": hparams["test_annotation"],
+            "text_cleaners": hparams["text_cleaners"],
+        }
+    elif hparams["corpus_name"] == 'mini_librispeech':
+        print("Prepping mini librispeech")
+        dataprep_fn = prepare_mini_librispeech
+        dataprep_kwargs = {
+            "data_folder": hparams["data_folder"],
+            "save_json_train": hparams["train_annotation"],
+            "save_json_valid": hparams["valid_annotation"],
+            "save_json_test": hparams["test_annotation"],
+        }
+    else:
+        raise ValueError("unknown corpus")
+
+    sb.utils.distributed.run_on_main(dataprep_fn, kwargs=dataprep_kwargs)
 
     # Train tokenizer
     hparams["tokenizer"]()

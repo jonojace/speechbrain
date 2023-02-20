@@ -13,17 +13,7 @@ cd Tokenizer
 python train.py tokenizer.yaml
 ```
 
-2. Train a LM
-After having our target tokens, we can train a language model on top of that. To do it, we need some large text corpus (better if the language domain is the same as the one of your target application). In this example, we simply train the LM on top of the training transcriptions:
-
-```
-cd ../LM
-python train.py RNNLM.yaml
-```
-
-In a real case, training LM is extremely computational demanding. It is thus a good practice to re-use existing LM or fine-tune them.
-
-3. Train the speech recognizer
+2.Train the speech recognizer
 At this point, we can train our speech recognizer. In this case, we are using a simple CRDNN model with an autoregressive GRU decoder. An attention mechanism is employed between encoding and decoder. The final sequence of words is retrieved with beamsearch coupled with the RNN LM trained in the previous step. To train the ASR:
 
 ```

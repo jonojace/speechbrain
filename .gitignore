@@ -155,3 +155,18 @@ dmypy.json
 
 # Mac OS
 .DS_Store
+
+# files created by experiments in speechbrain
+templates/speech_recognition_CharTokens_NoLM/data
+templates/speech_recognition_CharTokens_NoLM/ASR/logs_slurm
+templates/speech_recognition_CharTokens_NoLM/ASR/results
+templates/speech_recognition_CharTokens_NoLM/ASR/wandb
+templates/speech_recognition_CharTokens_NoLM/Tokenizer/save
+
+templates/speech_recognition/data
+templates/speech_recognition/ASR/logs_slurm
+templates/speech_recognition/ASR/results
+templates/speech_recognition/ASR/wandb
+templates/speech_recognition/Tokenizer/save
+
+

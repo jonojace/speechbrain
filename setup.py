@@ -29,6 +29,7 @@ setup(
         "License :: OSI Approved :: Apache Software License",
     ],
     packages=setuptools.find_packages(),
+    package_dir={"templates": "templates"},
     package_data={"speechbrain": ["version.txt", "log-config.yaml"]},
     install_requires=[
         "hyperpyyaml",
