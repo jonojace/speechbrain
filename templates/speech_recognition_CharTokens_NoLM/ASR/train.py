@@ -326,7 +326,7 @@ class ASR(sb.Brain):
             # print(f"DEBUG LOGGING VALID METRICS, {stage=}, {stage_stats=}")
 
             # Update learning rate
-            old_lr, new_lr = self.hparams.lr_annealing(stage_stats["WER"])
+            old_lr, new_lr = self.hparams.lr_annealing(stage_stats[self.hparams["metric_to_optimize"]])
             sb.nnet.schedulers.update_learning_rate(self.optimizer, new_lr)
 
             # The train_logger writes a summary to stdout and to the logfile.
@@ -338,7 +338,7 @@ class ASR(sb.Brain):
 
             # Save the current checkpoint and delete previous checkpoints.
             self.checkpointer.save_and_keep_only(
-                meta={"WER": stage_stats["WER"]}, min_keys=["WER"],
+                meta={self.hparams["metric_to_optimize"]: stage_stats[self.hparams["metric_to_optimize"]]}, min_keys=[self.hparams["metric_to_optimize"]],
             )
 
         # We also write statistics about test data to stdout and to the logfile.
@@ -368,6 +368,8 @@ def dataio_prepare(hparams):
         Dictionary containing "train", "valid", and "test" keys that correspond
         to the DynamicItemDataset objects.
     """
+    def remove_whitespace(s):
+        return s.replace(" ", "").replace("|", "")
 
     # Define audio pipeline. In this case, we simply read the path contained
     # in the variable wav with the audio reader.
@@ -395,6 +397,10 @@ def dataio_prepare(hparams):
         """Processes the transcriptions to generate proper labels
 
         NB Make sure that you yield exactly what is defined above in @sb.utils.data_pipeline.provides()"""
+        if hparams["no_whitespace"] is not None and hparams["no_whitespace"]:
+            # print("DEBUG1", words)
+            words = remove_whitespace(words)
+            # print("DEBUG2", words)
         yield words
 
         tokens_list = hparams["tokenizer"].encode_as_ids(words)
@@ -555,6 +561,6 @@ if __name__ == "__main__":
     # Load best checkpoint for evaluation
     test_stats = asr_brain.evaluate(
         test_set=datasets["test"],
-        min_key="WER",
+        min_key=hparams["metric_to_optimize"],
         test_loader_kwargs=hparams["test_dataloader_opts"],
     )
